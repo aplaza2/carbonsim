@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "carbonsim"
+version = "0.1.0"
+description = "Simulador de huella de carbono"
+authors = [
+    { name = "Alejandro Plaza", email = "aplaza2@uc.cl" }
+]
+requires-python = ">=3.8"
+
+dependencies = [
+    "numpy",
+    "pandas",
+    "psutil",
+    "requests",
+    "py-cpuinfo",
+    "pynvml",
+    "arrow",
+    "pydantic",
+]
