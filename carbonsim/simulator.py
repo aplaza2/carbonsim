@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import functools
 from datetime import datetime, timedelta
-from carbonsim.external.custom_codecarbon.codecarbon import EmissionsTracker
+from codecarbon import EmissionsTracker
 from typing import Optional
 
 from .logging_utils import LogLevel, print_emission_log, print_final_horizon, print_no_data, print_error
