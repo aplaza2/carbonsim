@@ -73,7 +73,7 @@ run_experiment()
 CarbonSim permite cargar parámetros desde un archivo de configuración. Ejemplo:
 
 ```ini
-[carbonsimulator]
+[carbonsim]
 project_name = Tests
 experiment_id = Exp-1
 interval_sec = 60
