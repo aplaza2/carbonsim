@@ -1,6 +1,7 @@
 # CarbonSim — Simulación y proyección de emisiones de CodeCarbon
 
-**CarbonSim** monitorea las **emisiones acumuladas** registradas por CodeCarbon y:  
+**CarbonSim** utiliza la variación personalisada de CodeCaron para monitorear las **emisiones acumuladas** registradas por CodeCarbon y realizar proyecciones. En particular:
+
 - Evalúa, en cada intervalo, la **capacidad predictiva** de tres modelos (lineal, polinómico grado 2 y 3) de forma **out-of-sample**.  
 - **Simula** la acumulación del **próximo intervalo**.  
 - Al finalizar, **elige el mejor modelo** según una métrica configurable (MAE/RMSE/MAPE) y **proyecta** al **horizonte** deseado.  
@@ -16,6 +17,7 @@
 ## Instalación
 
 ```bash
+pip install git+https://github.com/aplaza2/custom_codecarbon
 pip install git+https://github.com/aplaza2/carbonsim.git
 ```
 

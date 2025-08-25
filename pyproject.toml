@@ -14,21 +14,4 @@ requires-python = ">=3.8"
 dependencies = [
     "numpy",
     "pandas",
-    "arrow",
-    "click",
-    "fief-client[cli]",
-    "pandas",
-    "prometheus_client",
-    "psutil >= 6.0.0",
-    "py-cpuinfo",
-    "pydantic",
-    "pynvml",
-    "rapidfuzz",
-    "requests",
-    "questionary",
-    "rich",
-    "typer"
 ]
-
-[tool.setuptools.packages.find]
-include = ["carbonsim", "codecarbon"]
