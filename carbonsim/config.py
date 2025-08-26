@@ -6,7 +6,7 @@ from .logging_utils import LogLevel
 @dataclass
 class CarbonSimConfig:
     monitor_csv: str = "emissions_monitor.csv"
-    projections_file: str = "projections.csv"
+    projections_file: str = "emissions_projections.csv"
     interval_sec: int = 60
     horizon_sec: int = 3600          # 1 hora
     metric: str = "mae"              # mae | rmse | mape

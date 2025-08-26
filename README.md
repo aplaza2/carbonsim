@@ -90,7 +90,7 @@ ci_alpha = 0.05
 log_level = FULL
 carbon_csv = emissions_realtime.csv
 monitor_csv = emissions_monitor.csv
-projections_file = projections.csv
+projections_file = emissions_projections.csv
 codecarbon_log_level = info
 
 ```
@@ -100,7 +100,7 @@ codecarbon_log_level = info
 | Parámetro              | Default                    | Descripción                                                                   |
 | ---------------------- | -------------------------- | ----------------------------------------------------------------------------- |
 | `monitor_csv`          | `"emissions_monitor.csv"`  | Archivo de evaluación por intervalo                                           |
-| `projections_file`     | `"projections.csv"`        | Archivo de proyección final                                                   |
+| `projections_file`     | `"emissions_projections.csv"`        | Archivo de proyección final                                                   |
 | `interval_sec`         | `60`                       | Intervalo de medición en segundos                                             |
 | `horizon_sec`          | `3600`                     | Horizonte de proyección en segundos                                           |
 | `metric`               | `"mae"`                    | Métrica de evaluación: `mae`, `rmse`, `mape`                                  |
