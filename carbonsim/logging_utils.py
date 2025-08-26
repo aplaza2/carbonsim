@@ -71,7 +71,7 @@ def print_final_horizon(preds_h: dict[int, float],
         )
     elif log_level == LogLevel.BEST:
         print(
-            f"[CarbonSim | FINAL] Horizon = {horizon_sec}s | "
+            f"[carbonsim | FINAL] Horizon = {horizon_sec}s | "
             f"Estimated Emissions for Run = {preds_h.get(best_deg, np.nan):.6g} kg CO2eq"
         )
 
