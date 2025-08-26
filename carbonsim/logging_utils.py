@@ -5,6 +5,7 @@ class LogLevel(Enum):
     NONE = 0          # No imprime nada
     BEST = 1          # Solo la mejor estimación
     FULL = 2          # Toda la información como tu print actual
+    ERROR = 3         # Mensajes de error
 
 
 def print_emission_log(log_level, last_elapsed, y_real, proj_eval, ci_eval, sim_next, best_name, best_metric, interval_sec, metric_name):
@@ -15,7 +16,7 @@ def print_emission_log(log_level, last_elapsed, y_real, proj_eval, ci_eval, sim_
     - NONE: no imprime nada
     """
 
-    if log_level == LogLevel.NONE:
+    if log_level == LogLevel.NONE or log_level == LogLevel.ERROR:
         return
 
     def fmt_ci(ci):
@@ -55,7 +56,7 @@ def print_final_horizon(preds_h: dict[int, float],
     """
     Imprime la estimación final al horizonte según el log_level.
     """
-    if log_level == LogLevel.NONE:
+    if log_level == LogLevel.NONE or log_level == LogLevel.ERROR:
         return
     def ci_str(c):
         return "NA" if (c is None or c[0] is None) else f"[{c[0]:.6g},{c[1]:.6g}]"

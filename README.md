@@ -112,7 +112,7 @@ codecarbon_log_level = info
 | `ph_delta`             | `0.005`                    | Delta para Page–Hinkley                                                       |
 | `ph_lambda`            | `0.05`                     | Lambda para Page–Hinkley                                                      |
 | `ci_alpha`             | `0.05`                     | Nivel de confianza para intervalos                                            |
-| `log_level`            | `FULL`                     | Nivel de logs: `NONE`, `NEXT`, `FULL`                                         |
+| `log_level`            | `FULL`                     | Nivel de logs: `NONE`, `NEXT`, `FULL`, `ERROR`                                         |
 | `project_name`         | `"Proyections"`            | Nombre de proyecto para CodeCarbon                                            |
 | `experiment_id`        | `"DefaultExperiment"`      | ID de experimento para CodeCarbon                                             |
 | `carbon_csv`           | `"emissions_realtime.csv"` | CSV de emisiones acumuladas de CodeCarbon                                     |
@@ -128,6 +128,7 @@ codecarbon_log_level = info
 - `NONE`: no muestra información en consola
 - `NEXT`: solo muestra la estimación del siguiente intervalo
 - `FULL`: muestra toda la información, incluyendo métricas de evaluación y estimaciones por modelo
+- `ERROR`: solo muestra los errores
 
 ### Ejemplos de salida de logs:
 ```text
