@@ -1,58 +1,32 @@
 import os
-import configparser
 import threading
 import numpy as np
 import pandas as pd
 import functools
 from datetime import datetime, timedelta
 from codecarbon import EmissionsTracker
-from typing import Optional
 
-from .logging_utils import LogLevel, print_emission_log, print_final_horizon, print_no_data, print_error
-from .config import CarbonSimConfig
-from .models import PolyRegressor
+from .logging_utils import print_emission_log, print_final_horizon, print_no_data, print_error
+from .config import load_config
+from .regressor_models import PolyRegressor
 from .drift import PageHinkley
 
 def _mae(e): return np.nanmean(np.abs(e))
 def _rmse(e): return np.sqrt(np.nanmean(e**2))
 def _mape(e, y): return np.nanmean(np.abs(e) / np.maximum(np.abs(y), 1e-12)) * 100.0
 
+
 class CarbonSimulator:
     def __init__(self, **kwargs):
-        # 1. Cargar config base (defaults)
-        cfg = CarbonSimConfig()
-
-        # 2. Si hay archivo .carbonsim.config → merge
-        config_file = kwargs.pop("config_path", ".carbonsim.config")
-        if os.path.exists(config_file):
-            parser = configparser.ConfigParser()
-            parser.read(config_file)
-            if "carbonsim" in parser:
-                for key, value in parser["carbonsim"].items():
-                    if hasattr(cfg, key):
-                        casted = self._cast_type(getattr(cfg, key), value)
-                        setattr(cfg, key, casted)
-
-        # 3. kwargs sobreescribe lo anterior
-        for k, v in kwargs.items():
-            if hasattr(cfg, k):
-                setattr(cfg, k, v)
-
-        self.cfg = cfg.validate()
+    
+        cfg = load_config(config_path=".carbonsim.config", **kwargs)
+        self.cfg = cfg
         self.carbon_csv = cfg.carbon_csv
         self.monitor_csv = cfg.monitor_csv
         self.projections_file = cfg.projections_file
         self.interval_sec = cfg.interval_sec
         self.horizon_sec = cfg.horizon_sec
-        
-        log_level_str: Optional[str] = cfg.log_level
-        if log_level_str is None:
-            self.log_level = LogLevel.NONE
-        else:
-            try:
-                self.log_level = LogLevel[log_level_str.upper()]
-            except KeyError:
-                raise ValueError(f"Valor de log_level inválido: {log_level_str}")
+        self.log_level = cfg.log_level
 
         self.tracker = EmissionsTracker(
             output_file=self.carbon_csv,
@@ -82,16 +56,6 @@ class CarbonSimulator:
 
         self._ph = PageHinkley(delta=self.cfg.ph_delta, lamb=self.cfg.ph_lambda) \
             if self.cfg.drift_detector == "ph" else None
-    
-    def _cast_type(self, old_value, new_value):
-        """Helper: castea según el tipo del valor en cfg."""
-        if isinstance(old_value, bool):
-            return new_value.lower() in ("true", "1", "yes", "y")
-        if isinstance(old_value, int):
-            return int(new_value)
-        if isinstance(old_value, float):
-            return float(new_value)
-        return new_value
 
     # ---------- IO ----------
     def _init_monitor_csv(self):
@@ -372,29 +336,26 @@ class CarbonSimulator:
 
 
 
-def carbon_simulation(**decorator_kwargs):
+def carbon_simulation(*dargs, **decorator_kwargs):
     """
-    Decorador para ejecutar una función bajo un CarbonSimulator.
-    La configuración sigue esta prioridad:
-    1. Defaults de CarbonSimConfig
-    2. Archivo .carbonsim.config (si existe)
-    3. kwargs del decorador (más específicos)
+    Decorador para ejecutar bajo CarbonSimulator.
+    Permite usarlo con @carbon_simulation o @carbon_simulation(...)
     """
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            # 1. Instanciar el simulador con la misma lógica que CarbonSimulator
             sim = CarbonSimulator(**decorator_kwargs)
-
-            # 2. Iniciar el simulador
             sim.start()
-
             try:
                 result = func(*args, **kwargs)
             finally:
-                # 3. Detener el simulador
                 sim.stop()
-
             return result
         return wrapper
+
+    # Caso sin paréntesis: @carbon_simulation
+    if len(dargs) == 1 and callable(dargs[0]):
+        return decorator(dargs[0])
+    # Caso con paréntesis: @carbon_simulation(...)
     return decorator
+

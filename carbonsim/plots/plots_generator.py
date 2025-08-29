@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Iterable, Optional
-from .utils import _read_exclude_ids, _prepare_df, _require_columns, _apply_filters, _save_plot, _prepare_runs_info, _plot_time_series
+from .plots_utils import _read_exclude_ids, _prepare_df, _require_columns, _apply_filters, _save_plot, _prepare_runs_info, _plot_time_series
 
 
 def plot_projections(

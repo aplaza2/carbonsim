@@ -24,26 +24,10 @@ pip install git+https://github.com/aplaza2/carbonsim.git
 ## Uso Básico
 
 ```python
-from carbonsim import CarbonSimulator, CarbonSimConfig, carbon_simulation
+from carbonsim import CarbonSimulator, carbon_simulation
 
 # ---------------------------
-# 1. Usando configuración explícita
-# ---------------------------
-cfg = CarbonSimConfig(
-    carbon_csv="custom.csv",
-    monitor_csv="monitor.csv",
-    horizon_sec=120,
-    interval_sec=10,
-    metric="rmse",
-    log_level="FULL"
-)
-sim = CarbonSimulator(cfg)
-sim.start()
-# ... tu código aquí ...
-sim.stop()
-
-# ---------------------------
-# 2. Usando kwargs directamente
+# 1. Usando kwargs directamente
 # ---------------------------
 sim = CarbonSimulator(
     carbon_csv="custom.csv",
@@ -56,13 +40,12 @@ sim.start()
 sim.stop()
 
 # ---------------------------
-# 3. Usando decorador
+# 2. Usando decorador
 # ---------------------------
 @carbon_simulation(horizon_sec=120, interval_sec=10, log_level="FULL")
 def run_experiment():
     # Código de tu experimento aquí
-    for i in range(5):
-        print("Ejecutando iteración", i)
+    pass
 
 run_experiment()
 
@@ -142,3 +125,94 @@ codecarbon_log_level = info
 - `emissions_monitor.csv`: evaluación de cada intervalo con errores y proyecciones
 - `projections.csv`: proyección final hacia el horizonte
 - `emissions_realtime.csv`: CSV de CodeCarbon con las emisiones acumuladas
+
+## Otros módulos
+
+### carbonsim.plots
+Este módulo permite graficar emisiones y proyecciones acumuladas de distintos experimentos.
+
+#### `plot_projections(**kwargs)`
+
+Grafica **proyecciones acumuladas de emisiones** con intervalos de confianza opcionales.
+
+Parámetros:
+
+- `monitor_file` (str): CSV de monitoreo (default: emissions_monitor.csv).
+- `output_dir` (str): Carpeta donde guardar las gráficas (default: plots).
+- `run_id` (str, opcional): Filtrar por ID de ejecución.
+- `project_name` (str, opcional): Filtrar por nombre de proyecto.
+- `exclude_runs` (list[str], opcional): Lista de run_id a excluir.
+- `exclude_file` (str, opcional): Ruta a archivo con run_id a excluir.
+- `show_confidence` (bool): Si True, dibuja bandas de confianza (default: True).
+- `label_by` (str): Etiqueta usada en el título de la gráfica (experiment_id por defecto).
+
+Salida:
+Gráficas `.png` en `plots/<project_name>/projections/`.
+
+#### `plot_emissions(**kwargs)`
+
+Grafica emisiones reales acumuladas a lo largo del tiempo, agrupando por run_id o experiment_id.
+
+Parámetros:
+
+- `emissions_file` (str): CSV de emisiones (default: emissions_realtime.csv).
+- `output_dir` (str): Carpeta de salida.
+- `project_name` (str, opcional): Filtrar por proyecto.
+- `run_id` (str, opcional): Filtrar por run específico.
+- `exclude_runs` / `exclude_file`: Filtros de exclusión.
+- `label_by` (str): Agrupamiento para etiquetas (experiment_id por defecto).
+- `mark_endpoints` (bool): Marca los valores finales de cada curva.
+
+Salida:
+Gráficas `.png` en `plots/<project_name>/emissions.png`.
+
+#### `plot_emissions_rates(**kwargs)`
+
+Grafica la tasa instantánea de emisiones (emissions_rate) a lo largo del tiempo.
+
+Parámetros:
+
+- `emissions_file` (str): CSV de emisiones (default: emissions_realtime.csv).
+- `output_dir` (str): Carpeta de salida.
+- `project_name`, `run_id`: Filtros opcionales.
+- `excludes` (list[str], opcional): Lista de run_id a excluir.
+- `label_by` (str): Agrupamiento (experiment_id por defecto).
+- `mark_endpoints` (bool): Marca los valores finales.
+
+Salida:
+Gráficas `.png` en `plots/<project_name>/emissions_rates.png`.
+
+### carbonsim.writer
+
+Este módulo permite editar, renombrar o eliminar datos en los CSV definidos en la configuración (CarbonSimConfig).
+
+#### `rename_data(column, old_value, new_value, **kwargs)`
+
+Reemplaza valores en una columna de todos los archivos de resultados.
+
+Parámetros:
+
+- `column` (str): Nombre de la columna a modificar.
+- `old_value` (str): Valor a reemplazar.
+- `new_value` (str): Nuevo valor.
+- `**kwargs`: Sobrescribe parámetros de configuración (config_path=..., etc).
+
+#### `rename_data_by_run_id(run_id, column, new_value, **kwargs)`
+
+Modifica project_name o experiment_id únicamente en filas con un run_id específico.
+
+Parámetros:
+
+- `run_id` (str): Identificador de la corrida.
+- `column` (str): Solo puede ser "project_name" o "experiment_id".
+- `new_value` (str): Nuevo valor.
+- `**kwargs`: Sobrescribe configuración.
+
+#### `delete_run(run_id, **kwargs)`
+
+Elimina todas las filas asociadas a un run_id de los archivos de resultados.
+
+Parámetros:
+
+- `run_id` (str): Identificador de la corrida a eliminar.
+- `**kwargs`: Sobrescribe configuración.

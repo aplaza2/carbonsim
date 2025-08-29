@@ -1,7 +1,8 @@
 import os
 import configparser
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from .logging_utils import LogLevel
+from typing import Any
 
 @dataclass
 class CarbonSimConfig:
@@ -37,7 +38,7 @@ class CarbonSimConfig:
         if path and os.path.exists(path):
             parser = configparser.ConfigParser()
             parser.read(path, encoding="utf-8")
-            section = parser["carbonsimulator"] if "carbonsimulator" in parser else parser["DEFAULT"]
+            section = parser["carbonsim"] if "carbonsim" in parser else parser["DEFAULT"]
             for field_name, fdef in cfg.__dataclass_fields__.items():
                 if field_name in section:
                     value = section[field_name]
@@ -60,5 +61,72 @@ class CarbonSimConfig:
         self.regularization = self.regularization.lower()
         assert self.regularization in {"none", "ridge"}
         assert self.interval_sec > self.measure_power_secs * self.csv_write_interval, \
-            f"interval_sec debe ser > measure_power_secs*csv_write_interval = {self.measure_power_secs*self.csv_write_interval}"
+            f"interval_sec debe ser > measure_power_secs * csv_write_interval = {self.measure_power_secs*self.csv_write_interval}"
+        
+        lv = getattr(self, "log_level", None)
+        if lv is None:
+            self.log_level = LogLevel.NONE
+        elif isinstance(lv, LogLevel):
+            pass
+        elif isinstance(lv, str):
+            try:
+                self.log_level = LogLevel[lv.strip().upper()]
+            except KeyError:
+                raise ValueError(
+                    f"log_level inválido: {lv}. Opciones: {list(LogLevel.__members__.keys())}"
+                )
+        else:
+            raise TypeError(f"log_level debe ser str o LogLevel, no {type(lv)}")
+
+
         return self
+    
+def _cast_type(old_value, new_value):
+        """Helper: castea según el tipo del valor en cfg."""
+        if isinstance(old_value, bool):
+            return new_value.lower() in ("true", "1", "yes", "y")
+        if isinstance(old_value, int):
+            return int(new_value)
+        if isinstance(old_value, float):
+            return float(new_value)
+        return new_value
+
+
+def _find_config_file() -> str | None:
+    candidates = [
+        os.path.join(os.getcwd(), ".carbonsim.config"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), ".carbonsim.config"),
+        os.path.expanduser("~/.carbonsim.config"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def load_config(**overrides: Any) -> CarbonSimConfig:
+    # 1 Usar valores por defecto
+    cfg = CarbonSimConfig()
+
+    # 2 Detectar archivo de config
+    config_file = overrides.pop("config_path", _find_config_file())
+    if config_file and os.path.exists(config_file):
+        parser = configparser.ConfigParser()
+        parser.read(config_file, encoding="utf-8")
+        section = parser["carbonsim"] if "carbonsim" in parser else parser["DEFAULT"]
+
+        for field in fields(cfg):
+            if field.name in section:
+                old_value = getattr(cfg, field.name)
+                new_value = section[field.name]
+                setattr(cfg, field.name, _cast_type(old_value, new_value))
+
+    # 3 Aplicar overrides
+    for k, v in overrides.items():
+        if hasattr(cfg, k):
+            setattr(cfg, k, v)
+        else:
+            raise ValueError(f"[carbonsim WARNING] '{k}' no es un parámetro válido de CarbonSimConfig")
+
+    return cfg.validate()
+

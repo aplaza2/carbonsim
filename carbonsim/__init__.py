@@ -1,11 +1,10 @@
 from .simulator import CarbonSimulator, carbon_simulation
-from .config import CarbonSimConfig
-from . import plots
+from . import plots, writer
 
 __all__ = [
     "CarbonSimulator", 
     "carbon_simulation", 
-    "CarbonSimConfig",
-    "plots"
+    "plots",
+    "writer",
 ]
 __app_name__ = "carbonsim"
