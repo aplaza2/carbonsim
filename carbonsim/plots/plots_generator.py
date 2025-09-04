@@ -71,7 +71,8 @@ def plot_emissions(
     exclude_runs: Optional[Iterable[str]] = None,
     exclude_file: Optional[str] = None,
     label_by: str = "experiment_id",
-    mark_endpoints: bool = True
+    mark_endpoints: bool = True,
+    xlim: Optional[float] = None
 ):
     """Grafica todas las emisiones reales por proyecto (agrupando por run_id o experiment_id)."""
     excludes = _read_exclude_ids(exclude_runs, exclude_file)
@@ -86,10 +87,16 @@ def plot_emissions(
     for proj, df_proj in df.groupby("project_name"):
         folder = os.path.join(output_dir, proj)
         runs_info = _prepare_runs_info(df_proj, label_by, "emissions")
-        _plot_time_series(runs_info, title=f"Emissions for project {proj}",
-                          xlabel="Elapsed time (s)", ylabel="Cumulative emissions (kg CO2eq)",
-                          output_folder=folder, filename="emissions.png",
-                          mark_endpoints=mark_endpoints)
+        _plot_time_series(
+            runs_info,
+            title=f"Emissions for project {proj}",
+            xlabel="Elapsed time (s)",
+            ylabel="Cumulative emissions (kg CO2eq)",
+            output_folder=folder,
+            filename="emissions.png",
+            mark_endpoints=mark_endpoints,
+            xlim=xlim
+        )
 
 
 def plot_emissions_rates(
@@ -97,15 +104,15 @@ def plot_emissions_rates(
     output_dir: str = "plots",
     project_name: Optional[str] = None,
     run_id: Optional[str] = None,
-    excludes: Optional[Iterable[str]] = None,
+    exclude_runs: Optional[Iterable[str]] = None,
+    exclude_file: Optional[str] = None,
     mark_endpoints: bool = True,
     label_by: str = "experiment_id"
 ):
     """Grafica emissions_rate por proyecto (agrupando por run_id o experiment_id)."""
-    if excludes is None:
-        excludes = []
+    excludes = _read_exclude_ids(exclude_runs, exclude_file)
     df = _prepare_df(emissions_file)
-    _require_columns(df, ["project_name", "run_id", "timestamp", "emissions_rate"], emissions_file)
+    _require_columns(df, ["run_id", "project_name", "timestamp", "emissions"], emissions_file)
     df = _apply_filters(df, run_id, project_name, excludes)
 
     if df.empty:

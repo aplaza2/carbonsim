@@ -157,11 +157,12 @@ Parámetros:
 
 - `emissions_file` (str): CSV de emisiones (default: emissions_realtime.csv).
 - `output_dir` (str): Carpeta de salida.
-- `project_name` (str, opcional): Filtrar por proyecto.
-- `run_id` (str, opcional): Filtrar por run específico.
+- `project_name` (str): Filtrar por proyecto.
+- `run_id` (str): Filtrar por run específico.
 - `exclude_runs` / `exclude_file`: Filtros de exclusión.
 - `label_by` (str): Agrupamiento para etiquetas (experiment_id por defecto).
 - `mark_endpoints` (bool): Marca los valores finales de cada curva.
+- `xlim` (int): Límite de tiempo a graficar.
 
 Salida:
 Gráficas `.png` en `plots/<project_name>/emissions.png`.
@@ -175,7 +176,7 @@ Parámetros:
 - `emissions_file` (str): CSV de emisiones (default: emissions_realtime.csv).
 - `output_dir` (str): Carpeta de salida.
 - `project_name`, `run_id`: Filtros opcionales.
-- `excludes` (list[str], opcional): Lista de run_id a excluir.
+- `exclude_runs` / `exclude_file`: Filtros de exclusión.
 - `label_by` (str): Agrupamiento (experiment_id por defecto).
 - `mark_endpoints` (bool): Marca los valores finales.
 

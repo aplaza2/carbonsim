@@ -78,17 +78,46 @@ def _prepare_runs_info(df: pd.DataFrame, label_by: str, value_col: str) -> List[
     return runs_info
 
 
-def _plot_time_series(runs_info, title: str, xlabel: str, ylabel: str,
-                      output_folder: str, filename: str, mark_endpoints: bool = True):
+def _plot_time_series(
+    runs_info,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    output_folder: str,
+    filename: str,
+    mark_endpoints: bool = True,
+    xlim: Optional[float] = None,
+):
     """Función genérica para graficar curvas de tiempo de múltiples runs."""
     plt.figure(figsize=(11, 6))
+    all_y_visible = []
+
     for label_value, x, y, final_value in runs_info:
         plt.plot(x, y, label=label_value)
         if mark_endpoints:
-            plt.scatter(x.iloc[-1], y.iloc[-1], color=plt.gca().lines[-1].get_color(), s=30, zorder=3)
+            plt.scatter(
+                x.iloc[-1], y.iloc[-1],
+                color=plt.gca().lines[-1].get_color(),
+                s=30, zorder=3
+            )
+
+        if xlim is not None:
+            mask = x <= xlim
+            all_y_visible.extend(y[mask])
+        else:
+            all_y_visible.extend(y)
+
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.grid(True, linestyle="--", alpha=0.5)
     plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize="small")
+
+    if xlim is not None:
+        plt.xlim(0, xlim)
+
+    if all_y_visible:
+        ymin, ymax = min(all_y_visible), max(all_y_visible)
+        plt.ylim(ymin * 0.95, ymax * 1.05)
+
     _save_plot(plt.gcf(), output_folder, filename)
