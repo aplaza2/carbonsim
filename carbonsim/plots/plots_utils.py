@@ -3,22 +3,20 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Iterable, Optional, Set, List, Tuple
 
-def _read_exclude_ids(exclude_runs: Optional[Iterable[str]] = None,
-                      exclude_file: Optional[str] = None) -> Set[str]:
-    """Construye el conjunto de run_id a excluir combinando lista y archivo."""
-    excludes: Set[str] = set()
-    if exclude_runs:
-        excludes.update(map(str, exclude_runs))
-    if exclude_file:
+def _read_ids(runs: Optional[Iterable[str]] = None,
+              file: Optional[str] = None) -> Set[str]:
+    """Construye el conjunto de run_id combinando lista y archivo."""
+    runs_ids: Set[str] = set()
+    if runs:
+        runs_ids.update(map(str, runs))
+    if file:
         try:
-            with open(exclude_file, "r", encoding="utf-8") as f:
+            with open(file, "r", encoding="utf-8") as f:
                 file_ids = [line.strip() for line in f if line.strip()]
-            excludes.update(file_ids)
+            runs_ids.update(file_ids)
         except Exception as e:
-            print(f"[carbonsim WARNING] No se pudo leer exclude_file='{exclude_file}': {e}")
-    if excludes:
-        print(f"[carbonsim EXCLUDE] run_id excluidos: {sorted(excludes)}")
-    return excludes
+            print(f"[carbonsim WARNING] No se pudo leer file='{file}': {e}")
+    return runs_ids
 
 
 def _prepare_df(file_path: str,
@@ -38,16 +36,20 @@ def _require_columns(df: pd.DataFrame, cols: Iterable[str], name: str):
 
 
 def _apply_filters(df: pd.DataFrame,
-                   run_id: Optional[str] = None,
-                   project_name: Optional[str] = None,
+                   includes: Optional[Iterable[str]] = None,
                    excludes: Optional[Iterable[str]] = None) -> pd.DataFrame:
     """Aplica filtros por run_id, project_name y exclusions."""
-    if run_id:
-        df = df[df["run_id"] == run_id]
-    if project_name:
-        df = df[df["project_name"] == project_name]
+    if includes:
+        df = df[
+        df["run_id"].astype(str).isin(includes)
+        | df["experiment_id"].astype(str).isin(includes)
+        | df["project_name"].astype(str).isin(includes)
+    ]
+
     if excludes:
         df = df[~df["run_id"].astype(str).isin(excludes)]
+        df = df[~df["experiment_id"].astype(str).isin(excludes)]
+        df = df[~df["project_name"].astype(str).isin(excludes)]
     return df
 
 

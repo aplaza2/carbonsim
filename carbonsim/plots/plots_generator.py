@@ -2,21 +2,22 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Iterable, Optional
-from .plots_utils import _read_exclude_ids, _prepare_df, _require_columns, _apply_filters, _save_plot, _prepare_runs_info, _plot_time_series
+from .plots_utils import _read_ids, _prepare_df, _require_columns, _apply_filters, _save_plot, _prepare_runs_info, _plot_time_series
 
 
 def plot_projections(
     monitor_file: str = "emissions_monitor.csv",
     output_dir: str = "plots",
-    run_id: Optional[str] = None,
-    project_name: Optional[str] = None,
+    include_runs: Optional[Iterable[str]] = None,
+    include_file: Optional[str] = None,
     exclude_runs: Optional[Iterable[str]] = None,
     exclude_file: Optional[str] = None,
     show_confidence: bool = True,
     label_by: str = "experiment_id"
 ):
     """Grafica proyecciones acumuladas de emisiones (solo proyecciones)."""
-    excludes = _read_exclude_ids(exclude_runs, exclude_file)
+    includes = _read_ids(include_runs, include_file)
+    excludes = _read_ids(exclude_runs, exclude_file)
     df = _prepare_df(monitor_file)
     
     required_cols = [
@@ -26,7 +27,7 @@ def plot_projections(
         "best_model_eval"
     ]
     _require_columns(df, required_cols, monitor_file)
-    df = _apply_filters(df, run_id, project_name, excludes)
+    df = _apply_filters(df, includes, excludes)
 
     for rid, run_df in df.groupby("run_id"):
         proj_name = run_df["project_name"].iloc[0]
@@ -66,19 +67,22 @@ def plot_projections(
 def plot_emissions(
     emissions_file: str = "emissions_realtime.csv",
     output_dir: str = "plots",
-    project_name: Optional[str] = None,
-    run_id: Optional[str] = None,
+    include_runs: Optional[Iterable[str]] = None,
+    include_file: Optional[str] = None,
     exclude_runs: Optional[Iterable[str]] = None,
     exclude_file: Optional[str] = None,
     label_by: str = "experiment_id",
     mark_endpoints: bool = True,
-    xlim: Optional[float] = None
+    xlim: Optional[float] = None,
+    title: Optional[str] = None,
+    filename: str = "emissions.png"
 ):
     """Grafica todas las emisiones reales por proyecto (agrupando por run_id o experiment_id)."""
-    excludes = _read_exclude_ids(exclude_runs, exclude_file)
+    includes = _read_ids(include_runs, include_file)
+    excludes = _read_ids(exclude_runs, exclude_file)
     df = _prepare_df(emissions_file)
     _require_columns(df, ["run_id", "project_name", "timestamp", "emissions"], emissions_file)
-    df = _apply_filters(df, run_id, project_name, excludes)
+    df = _apply_filters(df, includes, excludes)
 
     if df.empty:
         print("[carbonsim INFO] No hay datos para graficar luego de filtros/excludes.")
@@ -87,13 +91,15 @@ def plot_emissions(
     for proj, df_proj in df.groupby("project_name"):
         folder = os.path.join(output_dir, proj)
         runs_info = _prepare_runs_info(df_proj, label_by, "emissions")
+        if title is None:
+            title = f"Emissions for project {proj}"
         _plot_time_series(
             runs_info,
-            title=f"Emissions for project {proj}",
+            title=title,
             xlabel="Elapsed time (s)",
             ylabel="Cumulative emissions (kg CO2eq)",
             output_folder=folder,
-            filename="emissions.png",
+            filename=filename,
             mark_endpoints=mark_endpoints,
             xlim=xlim
         )
@@ -102,18 +108,22 @@ def plot_emissions(
 def plot_emissions_rates(
     emissions_file: str = "emissions_realtime.csv",
     output_dir: str = "plots",
-    project_name: Optional[str] = None,
-    run_id: Optional[str] = None,
+    include_runs: Optional[Iterable[str]] = None,
+    include_file: Optional[str] = None,
     exclude_runs: Optional[Iterable[str]] = None,
     exclude_file: Optional[str] = None,
     mark_endpoints: bool = True,
-    label_by: str = "experiment_id"
+    label_by: str = "experiment_id",
+    xlim: Optional[float] = None,
+    title: Optional[str] = None,
+    filename: str = "emissions_rates.png"
 ):
     """Grafica emissions_rate por proyecto (agrupando por run_id o experiment_id)."""
-    excludes = _read_exclude_ids(exclude_runs, exclude_file)
+    includes = _read_ids(include_runs, include_file)
+    excludes = _read_ids(exclude_runs, exclude_file)
     df = _prepare_df(emissions_file)
     _require_columns(df, ["run_id", "project_name", "timestamp", "emissions"], emissions_file)
-    df = _apply_filters(df, run_id, project_name, excludes)
+    df = _apply_filters(df, includes, excludes)
 
     if df.empty:
         print("[carbonsim INFO] No hay datos para graficar con los filtros dados.")
@@ -122,7 +132,15 @@ def plot_emissions_rates(
     for proj, df_proj in df.groupby("project_name"):
         folder = os.path.join(output_dir, proj)
         runs_info = _prepare_runs_info(df_proj, label_by, "emissions_rate")
-        _plot_time_series(runs_info, title=f"Emission Rate for project {proj}",
-                          xlabel="Elapsed time (s)", ylabel="Emission rate (kg CO2eq/s)",
-                          output_folder=folder, filename="emissions_rates.png",
-                          mark_endpoints=mark_endpoints)
+        if title is None:
+            title = f"Emission Rate for project {proj}"
+        _plot_time_series(
+            runs_info, 
+            title=title,
+            xlabel="Elapsed time (s)", 
+            ylabel="Emission rate (kg CO2eq/s)",
+            output_folder=folder, 
+            filename=filename,
+            mark_endpoints=mark_endpoints,
+            xlim=xlim
+        )
