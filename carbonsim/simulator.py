@@ -17,6 +17,20 @@ def _mape(e, y): return np.nanmean(np.abs(e) / np.maximum(np.abs(y), 1e-12)) * 1
 
 
 class CarbonSimulator:
+    """
+    CarbonSimulator monitors and records the carbon footprint of an experiment.
+
+    This class uses an EmissionsTracker to measure energy consumption and carbon emissions
+    during the execution of an experiment. Each experiment has a unique `run_id` to
+    distinguish measurements in the CSV log. Additionally, it makes future emission
+    projections and can detect possible changes or drifts in emission patterns.
+
+    Main parameters:
+    - experiment_id: Identifier for the experiment.
+    - interval_sec: Time interval (in seconds) between measurements.
+    - monitor_csv: CSV file where measurements and projections are recorded.
+    - horizon_sec: Time horizon for final projections.
+    """
     def __init__(self, **kwargs):
     
         cfg = load_config(config_path=".carbonsim.config", **kwargs)
@@ -76,10 +90,10 @@ class CarbonSimulator:
         if df.empty:
             return df
         
-        current_run_id = df.iloc[-1].get("run_id", None)
-        if current_run_id is not None and "run_id" in df.columns:
-            df = df[df["run_id"] == current_run_id].copy()
+        current_run_id = str(getattr(self.tracker, "run_id", None))
+        df = df[df["run_id"] == current_run_id].copy()
 
+        df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
         df = df.sort_values("timestamp").drop_duplicates(subset=["timestamp"])
         df["emissions"] = pd.to_numeric(df["emissions"], errors="coerce")
         df = df.dropna(subset=["timestamp","emissions"])
@@ -119,11 +133,26 @@ class CarbonSimulator:
 
     # ---------- ciclo ----------
     def start(self):
+        """
+        Starts tracking the experiment's carbon emissions.
+
+        - Launches the EmissionsTracker to begin recording energy and emissions.
+        - Schedules the first call to `_monitor_step` to compute projections and update the monitor CSV.
+        - Records the experiment start time.
+        """
         self.start_time = datetime.now()
         self.tracker.start()
         self._schedule_next()
 
     def stop(self):
+        """
+        Stops tracking the experiment's carbon emissions.
+
+        - Cancels the timer that schedules `_monitor_step`.
+        - Waits for the last ongoing measurement to finish.
+        - Calls `_monitor_step(final=True)` to record the final horizon projection.
+        - Stops the EmissionsTracker.
+        """
         if self.timer:
             self.timer.cancel()
         self._monitor_step(final=True)
