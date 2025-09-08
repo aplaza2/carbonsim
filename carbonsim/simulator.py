@@ -86,7 +86,19 @@ class CarbonSimulator:
             ]).to_csv(self.monitor_csv, index=False)
 
     def _read_carbon_csv(self):
-        df = pd.read_csv(self.carbon_csv, parse_dates=["timestamp"])
+        df = pd.read_csv(
+            self.carbon_csv,
+            parse_dates=["timestamp"],
+            dtype={
+                "ram_power": "float64",
+                "cpu_energy": "float64",
+                "gpu_energy": "float64",
+                "cloud_provider": "string",
+                "cpu_model": "string",
+            },
+            low_memory=False
+        )
+
         if df.empty:
             return df
         
