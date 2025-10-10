@@ -89,6 +89,8 @@ def _plot_time_series(
     filename: str,
     mark_endpoints: bool = True,
     xlim: Optional[float] = None,
+    xscale: Optional[str] = None,
+    yscale: Optional[str] = None
 ):
     """Función genérica para graficar curvas de tiempo de múltiples runs."""
     plt.figure(figsize=(11, 6))
@@ -121,5 +123,10 @@ def _plot_time_series(
     if all_y_visible:
         ymin, ymax = min(all_y_visible), max(all_y_visible)
         plt.ylim(ymin * 0.95, ymax * 1.05)
+    
+    if xscale:
+        plt.xscale(xscale)
+    if yscale:
+        plt.yscale(yscale)
 
     _save_plot(plt.gcf(), output_folder, filename)

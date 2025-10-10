@@ -74,6 +74,8 @@ def plot_emissions(
     label_by: str = "experiment_id",
     mark_endpoints: bool = True,
     xlim: Optional[float] = None,
+    xscale: Optional[str] = None,
+    yscale: Optional[str] = None,
     title: Optional[str] = None,
     filename: str = "emissions.png"
 ):
@@ -101,7 +103,9 @@ def plot_emissions(
             output_folder=folder,
             filename=filename,
             mark_endpoints=mark_endpoints,
-            xlim=xlim
+            xlim=xlim,
+            xscale=xscale,
+            yscale=yscale
         )
 
 
@@ -115,6 +119,8 @@ def plot_emissions_rates(
     mark_endpoints: bool = True,
     label_by: str = "experiment_id",
     xlim: Optional[float] = None,
+    xscale: Optional[str] = None,
+    yscale: Optional[str] = None,
     title: Optional[str] = None,
     filename: str = "emissions_rates.png"
 ):
@@ -142,5 +148,7 @@ def plot_emissions_rates(
             output_folder=folder, 
             filename=filename,
             mark_endpoints=mark_endpoints,
-            xlim=xlim
+            xlim=xlim,
+            xscale=xscale,
+            yscale=yscale
         )

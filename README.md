@@ -163,6 +163,8 @@ Parámetros:
 - `label_by` (str): Agrupamiento para etiquetas (experiment_id por defecto).
 - `mark_endpoints` (bool): Marca los valores finales de cada curva.
 - `xlim` (int): Límite de tiempo a graficar.
+- `xscale` (str): Tipo de escala para el eje x.
+- `yscale` (str): Tipo de escala para el eje y.
 
 Salida:
 Gráficas `.png` en `plots/<project_name>/emissions.png`.
@@ -179,6 +181,9 @@ Parámetros:
 - `exclude_runs` / `exclude_file`: Filtros de exclusión.
 - `label_by` (str): Agrupamiento (experiment_id por defecto).
 - `mark_endpoints` (bool): Marca los valores finales.
+- `xlim` (int): Límite de tiempo a graficar.
+- `xscale` (str): Tipo de escala para el eje x.
+- `yscale` (str): Tipo de escala para el eje y.
 
 Salida:
 Gráficas `.png` en `plots/<project_name>/emissions_rates.png`.
