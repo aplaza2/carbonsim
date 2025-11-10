@@ -20,6 +20,7 @@ class CarbonSimConfig:
     ph_lambda: float = 0.05
     ci_alpha: float = 0.05
     log_level: LogLevel = LogLevel.FULL 
+    automatic_projections: bool = False
 
     # Parámetros CodeCarbon
     project_name: str = "Proyections"

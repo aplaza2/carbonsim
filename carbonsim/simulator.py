@@ -41,6 +41,7 @@ class CarbonSimulator:
         self.interval_sec = cfg.interval_sec
         self.horizon_sec = cfg.horizon_sec
         self.log_level = cfg.log_level
+        self.automatic_projections = cfg.automatic_projections
 
         self.tracker = EmissionsTracker(
             output_file=self.carbon_csv,
@@ -66,7 +67,8 @@ class CarbonSimulator:
         self.start_time = None
         self.timer = None
         self._lock = threading.Lock()
-        self._init_monitor_csv()
+        if self.automatic_projections:
+            self._init_monitor_csv()
 
         self._ph = PageHinkley(delta=self.cfg.ph_delta, lamb=self.cfg.ph_lambda) \
             if self.cfg.drift_detector == "ph" else None
@@ -166,6 +168,9 @@ class CarbonSimulator:
         except Exception:
             # best-effort stop; still try to process files
             pass
+
+        if not self.automatic_projections:
+            return
 
         # Build the monitor CSV from the realtime carbon file
         try:

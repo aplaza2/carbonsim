@@ -71,6 +71,7 @@ ph_delta = 0.005
 ph_lambda = 0.05
 ci_alpha = 0.05
 log_level = FULL
+automatic_projections = False
 carbon_csv = emissions_realtime.csv
 monitor_csv = emissions_monitor.csv
 projections_file = emissions_projections.csv
@@ -96,6 +97,7 @@ codecarbon_log_level = info
 | `ph_lambda`            | `0.05`                     | Lambda para Page–Hinkley                                                      |
 | `ci_alpha`             | `0.05`                     | Nivel de confianza para intervalos                                            |
 | `log_level`            | `FULL`                     | Nivel de logs: `NONE`, `NEXT`, `FULL`, `ERROR`                                         |
+| `automatic_projections`| `False`                    | Generación de proyecciones automática |
 | `project_name`         | `"Proyections"`            | Nombre de proyecto para CodeCarbon                                            |
 | `experiment_id`        | `"DefaultExperiment"`      | ID de experimento para CodeCarbon                                             |
 | `carbon_csv`           | `"emissions_realtime.csv"` | CSV de emisiones acumuladas de CodeCarbon                                     |
