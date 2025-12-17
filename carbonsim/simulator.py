@@ -103,14 +103,12 @@ class CarbonSimulator:
 
         if df.empty:
             return df
-        
-        current_run_id = str(getattr(self.tracker, "run_id", None))
-        df = df[df["run_id"] == current_run_id].copy()
 
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
         df = df.sort_values("timestamp").drop_duplicates(subset=["timestamp"])
         df["emissions"] = pd.to_numeric(df["emissions"], errors="coerce")
         df = df.dropna(subset=["timestamp","emissions"])
+
         return df
 
     # ---------- utils ----------
@@ -160,221 +158,284 @@ class CarbonSimulator:
     def stop(self):
         """
         Stop tracking and, **once stopped**, generate the full monitor CSV (by reading
-        emissions_realtime.csv) and then the final projections file.
+        the carbon emissions file) and then the final projections file.
         """
-        # Stop tracker first so carbon_csv is flushed & complete
+        # 1) Stop tracker so carbon_csv is fully flushed
         try:
             self.tracker.stop()
         except Exception:
-            # best-effort stop; still try to process files
-            pass
+            pass  # best-effort
 
         if not self.automatic_projections:
             return
 
-        # Build the monitor CSV from the realtime carbon file
+        # 2) Build monitor from realtime carbon CSV
         try:
             self._build_monitor_from_realtime()
         except Exception as e:
             print_error(e, self.log_level)
             return
 
-        # Now generate final projections based on the monitor CSV (same logic you had)
+        # 3) Build final projections from monitor
         try:
-            # Read the monitor we just built
-            mon = pd.read_csv(self.monitor_csv)
-            # if empty nothing to do
-            if mon.empty:
-                print_no_data(self.log_level)
-                return
+            self._build_projections_from_monitor()
+        except Exception as e:
+            print_error(e, self.log_level)
 
-            # Determine best_final across whole monitor (same code as before)
-            if self.cfg.metric == "mape":
-                if "real_emissions_kg" in mon:
-                    vals = []
-                    for col in ["error_linear","error_poly2","error_poly3"]:
-                        if col in mon:
-                            e = mon[col].values
-                            yv = mon["real_emissions_kg"].values
-                            vals.append(_mape(e, yv))
-                        else:
-                            vals.append(np.inf)
-                    best_final = ["linear","poly2","poly3"][int(np.nanargmin(vals))]
+    def _build_monitor_from_realtime(self):
+        df_all = self._read_carbon_csv()
+        if df_all is None or df_all.empty:
+            print_no_data(self.log_level)
+            return
+
+        rows = []
+
+        # 🔑 Procesar cada run_id por separado
+        for run_id, df in df_all.groupby("run_id"):
+            df = df.sort_values("timestamp").reset_index(drop=True)
+
+            t0 = df["timestamp"].iloc[0]
+            total_secs = (df["timestamp"].iloc[-1] - t0).total_seconds()
+            n_intervals = int(np.floor(total_secs / self.interval_sec))
+
+            if n_intervals == 0 and len(df) > 0:
+                n_intervals = 1
+
+            for k in range(1, n_intervals + 1):
+                cutoff = t0 + timedelta(seconds=k * self.interval_sec)
+                df_k = df[df["timestamp"] <= cutoff]
+                if df_k.empty:
+                    continue
+
+                last_row = df_k.iloc[-1]
+                elapsed = float((cutoff - t0).total_seconds())
+                real = float(last_row["emissions"])
+
+                project_name = last_row.get("project_name")
+                experiment_id = last_row.get("experiment_id")
+
+                if k == 1:
+                    proj_eval = {1: real, 2: real, 3: real}
+                    ci_eval = {1: (None, None), 2: (None, None), 3: (None, None)}
+                    errs = {1: 0.0, 2: 0.0, 3: 0.0}
+                    sim_next = {1: np.nan, 2: np.nan, 3: np.nan}
+                    sim_ci = {1: (None, None), 2: (None, None), 3: (None, None)}
+                    best_name = "linear"
+                    metric_value = np.nan
+                    drift_flag = False
                 else:
-                    best_final = "linear"
+                    times = (df_k["timestamp"] - t0).dt.total_seconds().values
+                    emissions = df_k["emissions"].values.astype(float)
+                    models = self._fit_models(times, emissions)
+
+                    proj_eval, ci_eval, errs = {}, {}, {}
+                    sim_next, sim_ci = {}, {}
+
+                    for deg, model in models.items():
+                        pred_eval, lo_eval, up_eval = model.predict(
+                            np.array([elapsed]),
+                            ci_alpha=self.cfg.ci_alpha,
+                            add_pred_var=False
+                        )
+                        proj_eval[deg] = float(pred_eval[0])
+                        ci_eval[deg] = (
+                            float(lo_eval[0]) if lo_eval is not None else None,
+                            float(up_eval[0]) if up_eval is not None else None
+                        )
+
+                        pred_next, lo_n, up_n = model.predict(
+                            np.array([elapsed + self.interval_sec]),
+                            ci_alpha=self.cfg.ci_alpha,
+                            add_pred_var=True
+                        )
+                        sim_next[deg] = float(pred_next[0])
+                        sim_ci[deg] = (
+                            float(lo_n[0]) if lo_n is not None else None,
+                            float(up_n[0]) if up_n is not None else None
+                        )
+
+                        errs[deg] = proj_eval[deg] - real
+
+                    best_name, metric_value = self._choose_best(
+                        errs, real if self.cfg.metric == "mape" else None
+                    )
+                    drift_flag = False
+
+                ci1 = ci_eval.get(1, (None, None))
+                ci2 = ci_eval.get(2, (None, None))
+                ci3 = ci_eval.get(3, (None, None))
+                sci1 = sim_ci.get(1, (None, None))
+                sci2 = sim_ci.get(2, (None, None))
+                sci3 = sim_ci.get(3, (None, None))
+
+                rows.append({
+                    "project_name": project_name,
+                    "run_id": run_id,
+                    "experiment_id": experiment_id,
+                    "elapsed_sec": elapsed,
+                    "real_emissions_kg": real,
+                    "proj_linear": proj_eval.get(1, np.nan),
+                    "proj_poly2": proj_eval.get(2, np.nan),
+                    "proj_poly3": proj_eval.get(3, np.nan),
+                    "ci_low_linear": ci1[0],
+                    "ci_up_linear": ci1[1],
+                    "ci_low_poly2": ci2[0],
+                    "ci_up_poly2": ci2[1],
+                    "ci_low_poly3": ci3[0],
+                    "ci_up_poly3": ci3[1],
+                    "error_linear": errs.get(1, np.nan),
+                    "error_poly2": errs.get(2, np.nan),
+                    "error_poly3": errs.get(3, np.nan),
+                    "sim_next_linear": sim_next.get(1, np.nan),
+                    "sim_next_poly2": sim_next.get(2, np.nan),
+                    "sim_next_poly3": sim_next.get(3, np.nan),
+                    "sim_ci_low_linear": sci1[0],
+                    "sim_ci_up_linear": sci1[1],
+                    "sim_ci_low_poly2": sci2[0],
+                    "sim_ci_up_poly2": sci2[1],
+                    "sim_ci_low_poly3": sci3[0],
+                    "sim_ci_up_poly3": sci3[1],
+                    "best_model_eval": best_name,
+                    "metric_value_eval": metric_value,
+                    "drift_flag": bool(drift_flag),
+                })
+
+        if rows:
+            df_rows = pd.DataFrame(rows)
+            df_rows.to_csv(self.monitor_csv, mode="w", index=False)
+        else:
+            print_no_data(self.log_level)
+
+
+    def _build_projections_from_monitor(self):
+        mon_all = pd.read_csv(self.monitor_csv)
+        if mon_all.empty:
+            print_no_data(self.log_level)
+            return
+
+        # Leer realtime completo una sola vez
+        df_all = self._read_carbon_csv()
+        if df_all.empty:
+            print_no_data(self.log_level)
+            return
+
+        rows = []
+
+        # 🔑 Proyección independiente por run_id
+        for run_id, mon in mon_all.groupby("run_id"):
+            mon = mon.sort_values("elapsed_sec")
+
+            # --- elegir mejor modelo para este run ---
+            if self.cfg.metric == "mape":
+                vals = []
+                for col in ["error_linear","error_poly2","error_poly3"]:
+                    if col in mon:
+                        e = mon[col].values
+                        y = mon["real_emissions_kg"].values
+                        vals.append(_mape(e, y))
+                    else:
+                        vals.append(np.inf)
+                best_final = ["linear","poly2","poly3"][int(np.nanargmin(vals))]
             else:
                 vals = []
                 for col in ["error_linear","error_poly2","error_poly3"]:
                     if col in mon:
                         e = mon[col].values
-                        vals.append(_mae(e) if self.cfg.metric == "mae" else _rmse(e))
+                        vals.append(
+                            _mae(e) if self.cfg.metric == "mae" else _rmse(e)
+                        )
                     else:
                         vals.append(np.inf)
                 best_final = ["linear","poly2","poly3"][int(np.nanargmin(vals))]
 
-            # Build final projections using last available models fitted on full realtime
-            # Reuse the logic you already had in _monitor_step final block:
-            df = self._read_carbon_csv()
+            # --- reconstruir modelos con realtime SOLO de este run ---
+            df = df_all[df_all["run_id"] == run_id].copy()
             if df.empty:
-                print_no_data(self.log_level)
-                return
+                continue
+
+            df = df.sort_values("timestamp").reset_index(drop=True)
 
             times = self._elapsed_seconds(df["timestamp"])
             emissions = df["emissions"].values.astype(float)
-            models_fit = self._fit_models(times, emissions)
+            models = self._fit_models(times, emissions)
 
             t0 = df["timestamp"].iloc[0]
-            horizon_abs = self.start_time + timedelta(seconds=self.horizon_sec)
-            target_h = max((horizon_abs - t0).total_seconds(), float(times[-1]))
+            horizon_abs = df["timestamp"].iloc[-1] + timedelta(seconds=self.horizon_sec)
+            target_h = (horizon_abs - t0).total_seconds()
 
             preds_h, ci_h = {}, {}
-            for deg, model in models_fit.items():
-                pred, lo, up = model.predict(np.array([target_h]), ci_alpha=self.cfg.ci_alpha, add_pred_var=True)
+            for deg, model in models.items():
+                pred, lo, up = model.predict(
+                    np.array([target_h]),
+                    ci_alpha=self.cfg.ci_alpha,
+                    add_pred_var=True
+                )
                 preds_h[deg] = float(pred[0])
                 ci_h[deg] = (
                     float(lo[0]) if lo is not None else None,
                     float(up[0]) if up is not None else None
                 )
 
-            best_deg = {"linear":1,"poly2":2,"poly3":3}[best_final]
+            best_deg = {"linear": 1, "poly2": 2, "poly3": 3}[best_final]
 
-            header = not os.path.exists(self.projections_file)
-            final_row = {
-                "project_name": mon["project_name"].iloc[-1] if "project_name" in mon.columns else self.cfg.project_name,
-                "run_id": mon["run_id"].iloc[-1] if "run_id" in mon.columns else None,
-                "experiment_id": mon["experiment_id"].iloc[-1] if "experiment_id" in mon.columns else self.cfg.experiment_id,
-                "timestamp_last": df["timestamp"].iloc[-1].isoformat(),
+            last_mon = mon.iloc[-1]
+            last_df = df.iloc[-1]
+
+            rows.append({
+                "project_name": last_mon.get("project_name"),
+                "run_id": run_id,
+                "experiment_id": last_mon.get("experiment_id"),
+                "timestamp_last": last_df["timestamp"].isoformat(),
                 "horizon_sec": self.horizon_sec,
                 "target_elapsed_sec": target_h,
-                "proj_linear": preds_h.get(1, np.nan),
-                "proj_poly2": preds_h.get(2, np.nan),
-                "proj_poly3": preds_h.get(3, np.nan),
-                "ci_low_linear": ci_h.get(1,(None,None))[0],
-                "ci_up_linear":  ci_h.get(1,(None,None))[1],
-                "ci_low_poly2":  ci_h.get(2,(None,None))[0],
-                "ci_up_poly2":   ci_h.get(2,(None,None))[1],
-                "ci_low_poly3":  ci_h.get(3,(None,None))[0],
-                "ci_up_poly3":   ci_h.get(3,(None,None))[1],
+                "proj_linear": preds_h.get(1),
+                "proj_poly2": preds_h.get(2),
+                "proj_poly3": preds_h.get(3),
+                "ci_low_linear": ci_h.get(1, (None, None))[0],
+                "ci_up_linear":  ci_h.get(1, (None, None))[1],
+                "ci_low_poly2":  ci_h.get(2, (None, None))[0],
+                "ci_up_poly2":   ci_h.get(2, (None, None))[1],
+                "ci_low_poly3":  ci_h.get(3, (None, None))[0],
+                "ci_up_poly3":   ci_h.get(3, (None, None))[1],
                 "best_model": best_final,
-                "best_projection": preds_h.get(best_deg, np.nan)
-            }
-            pd.DataFrame([final_row]).to_csv(self.projections_file, mode="a", header=header, index=False)
-            print_final_horizon(preds_h, ci_h, self.horizon_sec, best_deg, best_final, self.log_level)
+                "best_projection": preds_h.get(best_deg),
+            })
 
-        except Exception as e:
-            print_error(e, self.log_level)
-
-    def _build_monitor_from_realtime(self):
-        """
-        Construye emissions_monitor.csv leyendo todo emissions_realtime.csv y
-        creando una fila por intervalo de tamaño self.interval_sec.
-
-        Para cada intervalo k (t = k * interval_sec):
-        - usa todas las filas de realtime con timestamp <= t para obtener el último valor real
-        - si k == 1: coloca proyecciones de evaluación y sim_next en NaN/valor por defecto
-        - si k > 1: ajusta modelos con los datos hasta t y calcula:
-            * proj_*  = evaluación en t (out-of-sample usando hasta t)
-            * sim_next_* = predicción en t + interval_sec  (simulación del próximo intervalo)
-            * intervalos de confianza si el regresor lo provee
-        - guarda error = proj - real
-        Finalmente escribe todo el DataFrame a self.monitor_csv (sobrescribe).
-        """
-        df = self._read_carbon_csv()
-        if df is None or df.empty:
+        if not rows:
             print_no_data(self.log_level)
             return
 
-        # Datos básicos
-        df = df.sort_values("timestamp").reset_index(drop=True)
-        t0 = df["timestamp"].iloc[0]
-        total_secs = (df["timestamp"].iloc[-1] - t0).total_seconds()
-        n_intervals = int(np.floor(total_secs / self.interval_sec))
-        # Si al menos una medición y total_secs < interval_sec, igual creamos 1 fila:
-        if n_intervals == 0 and len(df) > 0:
-            n_intervals = 1
+        # 🔑 Escribir todas las proyecciones juntas
+        df_out = pd.DataFrame(rows)
+        header = not os.path.exists(self.projections_file)
+        df_out.to_csv(self.projections_file, mode="a", header=header, index=False)
 
-        rows = []
-        for k in range(1, n_intervals + 1):
-            cutoff = t0 + timedelta(seconds=k * self.interval_sec)
-            df_k = df[df["timestamp"] <= cutoff]
-            if df_k.empty:
-                continue
+        # Mensaje resumen
+        for row in rows:
+            print_final_horizon(
+                {1: row["proj_linear"], 2: row["proj_poly2"], 3: row["proj_poly3"]},
+                {
+                    1: (row["ci_low_linear"], row["ci_up_linear"]),
+                    2: (row["ci_low_poly2"], row["ci_up_poly2"]),
+                    3: (row["ci_low_poly3"], row["ci_up_poly3"]),
+                },
+                self.horizon_sec,
+                {"linear":1,"poly2":2,"poly3":3}[row["best_model"]],
+                row["best_model"],
+                self.log_level,
+            )
 
-            last_row = df_k.iloc[-1]
-            project_name = last_row.get("project_name", None)
-            run_id = last_row.get("run_id", None)
-            experiment_id = last_row.get("experiment_id", None)
-            elapsed = float((cutoff - t0).total_seconds())
-            real = float(last_row["emissions"])
+    
+    def generate_projections(self):
+        """
+        Construye monitor_csv y projections_file a partir de un carbon_csv existente.
+        No inicia ni detiene EmissionsTracker.
+        """
+        if not os.path.exists(self.carbon_csv):
+            raise FileNotFoundError(f"No existe carbon_csv: {self.carbon_csv}")
 
-            if k == 1:
-                proj_eval = {1: real, 2: real, 3: real}
-                ci_eval = {1: (None, None), 2: (None, None), 3: (None, None)}
-                errs = {1: np.nan, 2: np.nan, 3: np.nan}
-                sim_next = {1: np.nan, 2: np.nan, 3: np.nan}
-                sim_ci = {1: (None, None), 2: (None, None), 3: (None, None)}
-                best_name = "linear"
-                metric_value = np.nan
-                drift_flag = False
-            else:
-                times = (df_k["timestamp"] - t0).dt.total_seconds().values
-                emissions = df_k["emissions"].values.astype(float)
-                models = self._fit_models(times, emissions)
-
-                proj_eval, ci_eval, errs = {}, {}, {}
-                sim_next, sim_ci = {}, {}
-                for deg, model in models.items():
-                   
-                    pred_eval, lo_eval, up_eval = model.predict(np.array([elapsed]), ci_alpha=self.cfg.ci_alpha, add_pred_var=False)
-                    proj_eval[deg] = float(pred_eval[0])
-                    ci_eval[deg] = (
-                        float(lo_eval[0]) if lo_eval is not None else None,
-                        float(up_eval[0]) if up_eval is not None else None
-                    )
-                    
-                    pred_next, lo_n, up_n = model.predict(np.array([elapsed + self.interval_sec]), ci_alpha=self.cfg.ci_alpha, add_pred_var=True)
-                    sim_next[deg] = float(pred_next[0])
-                    sim_ci[deg] = (
-                        float(lo_n[0]) if lo_n is not None else None,
-                        float(up_n[0]) if up_n is not None else None
-                    )
-                    errs[deg] = proj_eval[deg] - real
-
-                best_name, metric_value = self._choose_best(errs, real if self.cfg.metric == "mape" else None)
-                drift_flag = False  # Mantengo simple: si quieres aplicar Page-Hinkley por fila, podemos acumular errores y usar self._ph.update()
-
-            ci1 = ci_eval.get(1,(None,None)); ci2 = ci_eval.get(2,(None,None)); ci3 = ci_eval.get(3,(None,None))
-            sci1 = sim_ci.get(1,(None,None)); sci2 = sim_ci.get(2,(None,None)); sci3 = sim_ci.get(3,(None,None))
-
-            row = {
-                "project_name": project_name,
-                "run_id": run_id,
-                "experiment_id": experiment_id,
-                "elapsed_sec": elapsed,
-                "real_emissions_kg": real,
-                "proj_linear": proj_eval.get(1, np.nan), "proj_poly2": proj_eval.get(2, np.nan), "proj_poly3": proj_eval.get(3, np.nan),
-                "ci_low_linear": ci1[0], "ci_up_linear": ci1[1],
-                "ci_low_poly2": ci2[0], "ci_up_poly2": ci2[1],
-                "ci_low_poly3": ci3[0], "ci_up_poly3": ci3[1],
-                "error_linear": errs.get(1, np.nan), "error_poly2": errs.get(2, np.nan), "error_poly3": errs.get(3, np.nan),
-                "sim_next_linear": sim_next.get(1, np.nan), "sim_next_poly2": sim_next.get(2, np.nan), "sim_next_poly3": sim_next.get(3, np.nan),
-                "sim_ci_low_linear": sci1[0], "sim_ci_up_linear": sci1[1],
-                "sim_ci_low_poly2": sci2[0], "sim_ci_up_poly2": sci2[1],
-                "sim_ci_low_poly3": sci3[0], "sim_ci_up_poly3": sci3[1],
-                "best_model_eval": best_name,
-                "metric_value_eval": metric_value,
-                "drift_flag": bool(drift_flag),
-            }
-            rows.append(row)
-
-        # Escribir monitor
-        if rows:
-            df_rows = pd.DataFrame(rows)
-            file_exists = os.path.exists(self.monitor_csv)
-            df_rows.to_csv(self.monitor_csv, mode="a", header=not file_exists, index=False)
-        
-        else:
-            print_no_data(self.log_level)
+        self._build_monitor_from_realtime()
+        self._build_projections_from_monitor()
 
 
 def carbon_simulation(*dargs, **decorator_kwargs):
@@ -400,3 +461,12 @@ def carbon_simulation(*dargs, **decorator_kwargs):
     # Caso con paréntesis: @carbon_simulation(...)
     return decorator
 
+
+def generate_carbon_projections(**sim_kwargs):
+    """
+    API funcional post-hoc.
+    Respeta defaults + .config + kwargs.
+    """
+    sim = CarbonSimulator(log_level="error", **sim_kwargs)
+    sim.generate_projections()
+    return sim

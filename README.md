@@ -128,6 +128,11 @@ codecarbon_log_level = info
 - `projections.csv`: proyección final hacia el horizonte
 - `emissions_realtime.csv`: CSV de CodeCarbon con las emisiones acumuladas
 
+## Generación manual de proyecciones
+```
+generate_carbon_projections(**kwargs)
+```
+
 ## Otros módulos
 
 ### carbonsim.plots
