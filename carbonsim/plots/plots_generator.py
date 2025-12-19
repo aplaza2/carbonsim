@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Iterable, Optional
-from .plots_utils import _read_ids, _prepare_df, _require_columns, _apply_filters, _save_plot, _prepare_runs_info, _plot_time_series
+from .plots_utils import _read_ids, _prepare_df, _require_columns, _apply_filters, _save_plot, _prepare_runs_info, _plot_time_series, _to_float
 
 
 def plot_emissions(
@@ -177,6 +177,8 @@ def plot_multiple_projections(
 
     mon = _prepare_df(monitor_file)
     proj = _prepare_df(projections_file)
+    proj = proj.drop_duplicates(subset=["run_id"], keep="last")
+
 
     _require_columns(
         mon,
@@ -229,8 +231,8 @@ def plot_multiple_projections(
 
             # -------- tramo proyectado --------
             t_last = float(x_real[-1])
-            t_target = float(p["target_elapsed_sec"])
-            y_target = float(p[proj_col])
+            t_target = _to_float(p["target_elapsed_sec"])
+            y_target = _to_float(p[proj_col])
 
             if t_target > t_last:
                 plt.plot(

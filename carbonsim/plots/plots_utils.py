@@ -3,6 +3,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from typing import Iterable, Optional, Set, List, Tuple
 
+def _to_float(x):
+    if isinstance(x, pd.Series):
+        return float(x.iloc[0])
+    return float(x)
+
 def _read_ids(runs: Optional[Iterable[str]] = None,
               file: Optional[str] = None) -> Set[str]:
     """Construye el conjunto de run_id combinando lista y archivo."""

@@ -138,24 +138,6 @@ generate_carbon_projections(**kwargs)
 ### carbonsim.plots
 Este módulo permite graficar emisiones y proyecciones acumuladas de distintos experimentos.
 
-#### `plot_projections(**kwargs)`
-
-Grafica **proyecciones acumuladas de emisiones** con intervalos de confianza opcionales.
-
-Parámetros:
-
-- `monitor_file` (str): CSV de monitoreo (default: emissions_monitor.csv).
-- `output_dir` (str): Carpeta donde guardar las gráficas (default: plots).
-- `run_id` (str, opcional): Filtrar por ID de ejecución.
-- `project_name` (str, opcional): Filtrar por nombre de proyecto.
-- `exclude_runs` (list[str], opcional): Lista de run_id a excluir.
-- `exclude_file` (str, opcional): Ruta a archivo con run_id a excluir.
-- `show_confidence` (bool): Si True, dibuja bandas de confianza (default: True).
-- `label_by` (str): Etiqueta usada en el título de la gráfica (experiment_id por defecto).
-
-Salida:
-Gráficas `.png` en `plots/<project_name>/projections/`.
-
 #### `plot_emissions(**kwargs)`
 
 Grafica emisiones reales acumuladas a lo largo del tiempo, agrupando por run_id o experiment_id.
@@ -165,7 +147,7 @@ Parámetros:
 - `emissions_file` (str): CSV de emisiones (default: emissions_realtime.csv).
 - `output_dir` (str): Carpeta de salida.
 - `project_name` (str): Filtrar por proyecto.
-- `run_id` (str): Filtrar por run específico.
+- `include_runs` / `include_file`: Filtros de inclusión.
 - `exclude_runs` / `exclude_file`: Filtros de exclusión.
 - `label_by` (str): Agrupamiento para etiquetas (experiment_id por defecto).
 - `mark_endpoints` (bool): Marca los valores finales de cada curva.
@@ -184,7 +166,7 @@ Parámetros:
 
 - `emissions_file` (str): CSV de emisiones (default: emissions_realtime.csv).
 - `output_dir` (str): Carpeta de salida.
-- `project_name`, `run_id`: Filtros opcionales.
+- `include_runs` / `include_file`: Filtros de inclusión.
 - `exclude_runs` / `exclude_file`: Filtros de exclusión.
 - `label_by` (str): Agrupamiento (experiment_id por defecto).
 - `mark_endpoints` (bool): Marca los valores finales.
@@ -194,6 +176,39 @@ Parámetros:
 
 Salida:
 Gráficas `.png` en `plots/<project_name>/emissions_rates.png`.
+
+#### `plot_projections(**kwargs)`
+
+Grafica **proyecciones acumuladas de emisiones** individualmente.
+
+Parámetros:
+
+- `monitor_file` (str): CSV de monitoreo (default: emissions_monitor.csv).
+- `output_dir` (str): Carpeta donde guardar las gráficas (default: plots).
+- `include_runs` / `include_file`: Filtros de inclusión.
+- `exclude_runs` / `exclude_file`: Filtros de exclusión.
+- `show_confidence` (bool): Si True, dibuja bandas de confianza (default: True).
+- `label_by` (str): Etiqueta usada en el título de la gráfica (experiment_id por defecto).
+
+Salida:
+Gráficas `.png` en `plots/<project_name>/projections/`.
+
+#### `plot_multiple_projections(**kwargs)`
+
+Grafica **proyecciones acumuladas de emisiones** agrupados por conjunto de experimento.
+
+Parámetros:
+
+- `monitor_file` (str): CSV de monitoreo (default: emissions_monitor.csv).
+- `projections_file` (str): CSV de proyecciones (default: emissions_projections.csv).
+- `output_dir` (str): Carpeta donde guardar las gráficas (default: plots).
+- `include_runs` / `include_file`: Filtros de inclusión.
+- `exclude_runs` / `exclude_file`: Filtros de exclusión.
+- `show_confidence` (bool): Si True, dibuja bandas de confianza (default: True).
+- `label_by` (str): Etiqueta usada en el título de la gráfica (experiment_id por defecto).
+
+Salida:
+Gráficas `.png` en `plots/<project_name>/projections/`.
 
 ### carbonsim.writer
 
